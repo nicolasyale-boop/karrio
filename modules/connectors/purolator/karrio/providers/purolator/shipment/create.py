@@ -69,6 +69,18 @@ def _extract_shipment(
         DocumentDetail(),
     )
     invoice = next((doc for doc in documents if "Invoice" in doc.DocumentType), None)
+    
+    piece_pins_container = lib.find_element("PiecePINs", response, first=True)
+    
+    individual_pins = []
+    if piece_pins_container is not None:
+        pins_elements = lib.find_element("PIN", piece_pins_container, PIN)
+        individual_pins = [p.Value for p in pins_elements if getattr(p, "Value", None)]
+
+    # In case Purolator returns a single PIN instead of a list, we ensure that individual_pins is populated correctly.
+    if not individual_pins and pin.Value:
+        individual_pins = [pin.Value]
+
 
     return models.ShipmentDetails(
         carrier_name=settings.carrier_name,
@@ -81,6 +93,7 @@ def _extract_shipment(
         ),
         meta=dict(
             carrier_tracking_link=settings.tracking_url.format(pin.Value),
+            tracking_numbers=individual_pins,
         ),
     )
 
