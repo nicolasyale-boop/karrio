@@ -142,14 +142,11 @@ def _shipment_request(
         initializer=provider_units.shipping_options_initializer,
     )
 
-    # Récupération sécurisée via le SDK Karrio
-    # .state renvoie directement la chaîne de caractères si l'option est présente, sinon None
     ref_1 = options.reference1.state or payload.reference or ""
     ref_2 = options.reference2.state or ""
     ref_3 = options.reference3.state or ""
     ref_4 = options.reference4.state or ""
 
-    # --- SÉPARATION PROPRE DES OPTIONS ---
     shipment_options = []
     piece_options = []
     version = "v2"  # Correspond au namespace XML v2 détecté dans vos logs
