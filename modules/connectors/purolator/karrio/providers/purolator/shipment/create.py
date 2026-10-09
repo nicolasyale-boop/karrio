@@ -175,6 +175,11 @@ def _shipment_request(
     recipient_phone_number = units.Phone(
         recipient.phone_number or "000 000 0000", recipient.country_code
     )
+    return_address_phone_number = units.Phone(
+        return_address.phone_number or "000 000 0000", return_address.country_code
+    )
+
+    has_return_address = getattr(payload, "return_address", None) is not None
 
     request = lib.create_envelope(
         header_content=RequestContext(
@@ -242,8 +247,35 @@ def _shipment_request(
                     ),
                     TaxNumber=(recipient.federal_tax_id or recipient.state_tax_id),
                 ),
-                FromOnLabelIndicator=None,
-                FromOnLabelInformation=None,
+                #FromOnLabelIndicator=None,
+                FromOnLabelIndicator=True if has_return_address else None,
+                FromOnLabelInformation=FromOnLabelInformation(
+                    Address=Address(
+                        Name=return_address.person_name if return_address else None,
+                        Company=return_address.company_name if return_address else None,
+                        Department=None,
+                        StreetNumber=return_address.street_number if return_address else None,
+                        StreetSuffix=None,
+                        StreetName=lib.text(return_address.address_line1) if return_address else None,
+                        StreetType=None,
+                        StreetDirection=None,
+                        Suite=None,
+                        Floor=None,
+                        StreetAddress2=lib.text(return_address.address_line2) if return_address else None,
+                        StreetAddress3=None,
+                        City=return_address.city if return_address else None,
+                        Province=return_address.state_code if return_address else None,
+                        Country=return_address.country_code if return_address else None,
+                        PostalCode=return_address.postal_code if return_address else None,
+                        PhoneNumber=PhoneNumber(
+                            CountryCode=return_address_phone_number.country_code or "0",
+                            AreaCode=return_address_phone_number.area_code or "0",
+                            Phone=return_address_phone_number.phone or "0",
+                            Extension=None,
+                        ),
+                        FaxNumber=None,
+                    ),
+                ),
                 ShipmentDate=options.shipment_date.state,
                 PackageInformation=PackageInformation(
                     ServiceID=service,
