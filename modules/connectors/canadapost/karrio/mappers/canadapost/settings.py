@@ -13,6 +13,7 @@ class Settings(utils.Settings):
     password: str = attr.ib(metadata={"sensitive": True})
     customer_number: str = None
     contract_id: str = None
+    zonos_key: str = attr.ib(default=None, metadata={"sensitive": True})
     # contract_id: str = attr.ib(default=None, metadata={"sensitive": True})
     language: utils.LanguageEnum = "en"  # type: ignore
 
