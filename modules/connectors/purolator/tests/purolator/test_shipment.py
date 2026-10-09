@@ -5,6 +5,7 @@ from karrio.core.utils import DP
 from karrio.core.models import ShipmentRequest, ShipmentCancelRequest
 from karrio.sdk import Shipment
 from .fixture import gateway
+from modules.connectors.purolator.karrio.providers.purolator.units import shipping_options_initializer
 
 
 class TestPurolatorShipment(unittest.TestCase):
@@ -86,6 +87,36 @@ class TestPurolatorShipment(unittest.TestCase):
             self.assertEqual(
                 DP.to_dict(parsed_response), DP.to_dict(PARSED_CANCEL_SHIPMENT_RESPONSE)
             )
+
+class TestPurolatorDangerousGoods(unittest.TestCase):
+
+    def test_domestic_ground_dangerous_goods(self):
+        # Cas 1 : Service Ground + Destination Canada (CA)
+        payload_options = {
+            "purolator_dangerous_goods": True,
+            "purolator_dangerous_goods_class": 5, # Doit être traduit en "LimitedQuantities"
+            "service": "PurolatorGround",
+            "country_code": "CA"
+        }
+        options = shipping_options_initializer(payload_options)
+        
+        # Vérifications
+        self.assertEqual(options["purolator_dangerous_goods_class"].state, "LimitedQuantities")
+        self.assertEqual(options["purolator_dangerous_goods_mode"].state, "Ground")
+
+    def test_us_ground_dangerous_goods_forces_air(self):
+        # Cas 2 : Service Ground + Destination USA (US) -> Doit forcer "Air"
+        payload_options = {
+            "purolator_dangerous_goods": True,
+            "purolator_dangerous_goods_class": "1", # Devrait renvoyer "FullyRegulated"
+            "service": "PurolatorGroundU.S.",
+            "country_code": "US"
+        }
+        options = shipping_options_initializer(payload_options)
+        
+        # Vérifications
+        self.assertEqual(options["purolator_dangerous_goods_class"].state, "FullyRegulated")
+        self.assertEqual(options["purolator_dangerous_goods_mode"].state, "Air") # Règle US respectée !           
 
 
 if __name__ == "__main__":

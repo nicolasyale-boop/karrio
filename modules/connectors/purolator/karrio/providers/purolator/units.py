@@ -72,21 +72,39 @@ class CreditCardType(lib.StrEnum):
     mastercard = "Mastercard"
     american_express = "AmericanExpress"
 
+class PurolatorDangerousGoodsClass(lib.Enum):
+    FullyRegulated = "FullyRegulated"
+    LessThan500kgExempt = "LessThan500kgExempt"
+    LimitedQuantities = "LimitedQuantities"
+    UN3373 = "UN3373"
+    UN1845 = "UN1845"
+
+DANGEROUS_GOODS_CLASS_MAPPING = {
+    "1": PurolatorDangerousGoodsClass.FullyRegulated.value,
+    "2": PurolatorDangerousGoodsClass.UN3373.value,
+    "3": PurolatorDangerousGoodsClass.UN1845.value,
+    "4": PurolatorDangerousGoodsClass.LessThan500kgExempt.value,
+    "5": PurolatorDangerousGoodsClass.LimitedQuantities.value,
+}
+
+translate_dg_class = lambda val: DANGEROUS_GOODS_CLASS_MAPPING.get(str(val), str(val))
 
 class ShippingOption(lib.Enum):
-    purolator_dangerous_goods = lib.OptionEnum("Dangerous Goods", meta=dict(category="DANGEROUS_GOOD"))
-    purolator_chain_of_signature = lib.OptionEnum("Chain of Signature", meta=dict(category="SIGNATURE"))
-    purolator_express_cheque = lib.OptionEnum("ExpressCheque", meta=dict(category="COD"))
-    purolator_hold_for_pickup = lib.OptionEnum("Hold For Pickup", meta=dict(category="PUDO"))
-    purolator_return_services = lib.OptionEnum("Return Services", meta=dict(category="RETURN"))
-    purolator_saturday_service = lib.OptionEnum("Saturday Service", meta=dict(category="DELIVERY_OPTIONS"))
+    purolator_dangerous_goods = lib.OptionEnum("DangerousGoods",bool, meta=dict(category="DANGEROUS_GOOD"))
+    purolator_dangerous_goods_mode = lib.OptionEnum("DangerousGoodsMode",str, meta=dict(category="DANGEROUS_GOOD"))
+    purolator_dangerous_goods_class = lib.OptionEnum("DangerousGoodsClass",translate_dg_class, meta=dict(category="DANGEROUS_GOOD"))
+    purolator_chain_of_signature = lib.OptionEnum("ChainOfSignature",bool, meta=dict(category="SIGNATURE"))
+    purolator_express_cheque = lib.OptionEnum("ExpressCheque",bool, meta=dict(category="COD"))
+    purolator_hold_for_pickup = lib.OptionEnum("HoldForPickup",bool, meta=dict(category="PUDO"))
+    purolator_return_services = lib.OptionEnum("ReturnServices",bool, meta=dict(category="RETURN"))
+    purolator_saturday_service = lib.OptionEnum("SaturdayDelivery",bool, meta=dict(category="DELIVERY_OPTIONS"))
     purolator_origin_signature_not_required = lib.OptionEnum(
-        "Origin Signature Not Required (OSNR)", meta=dict(category="SIGNATURE")
+        "OriginSignatureNotRequired",bool, meta=dict(category="SIGNATURE")
     )
     purolator_adult_signature_required = lib.OptionEnum(
-        "Adult Signature Required (ASR)", meta=dict(category="SIGNATURE")
+        "AdultSignatureRequired",bool, meta=dict(category="SIGNATURE")
     )
-    purolator_special_handling = lib.OptionEnum("Special Handling")
+    purolator_special_handling = lib.OptionEnum("SpecialHandling",bool, meta=dict(category="SPECIAL_HANDLING"))
 
     """Karrio specific option"""
     purolator_show_alternative_services = lib.OptionEnum(
@@ -95,6 +113,13 @@ class ShippingOption(lib.Enum):
 
     """ Unified Option type mapping """
     saturday_delivery = purolator_saturday_service
+
+    """ Additional references for shipment """
+    reference1 = lib.OptionEnum("reference1", str, meta=dict(category="REFERENCE"))
+    reference2 = lib.OptionEnum("reference2", str, meta=dict(category="REFERENCE"))
+    reference3 = lib.OptionEnum("reference3", str, meta=dict(category="REFERENCE"))
+    reference4 = lib.OptionEnum("reference4", str, meta=dict(category="REFERENCE"))
+    # -----------------------------------------------
 
 
 def shipping_options_initializer(
@@ -109,6 +134,25 @@ def shipping_options_initializer(
 
     if package_options is not None:
         _options.update(package_options.content)
+
+    has_dangerous_goods = (
+        _options.get("purolator_dangerous_goods") is True 
+        or _options.get("purolator_dangerous_goods_class") not in [None, ""]
+    )
+
+    if has_dangerous_goods:
+        _options["purolator_dangerous_goods"] = True
+
+    if has_dangerous_goods and "purolator_dangerous_goods_mode" not in _options:
+        selected_service = str(_options.get("service") or "").lower()
+        destination_country = str(_options.get("country_code") or "CA").upper()
+        
+        # RULE : "Ground" ONLY if service type is ground and destination country is NOT US, otherwise default to "Air"
+        if "ground" in selected_service and destination_country != "US":
+            _options["purolator_dangerous_goods_mode"] = "Ground"
+        else:
+            # Force AIR for anything else (including international shipments and US shipments)
+            _options["purolator_dangerous_goods_mode"] = "Air"
 
     # When no specific service is requested, set a default one.
     _options.update(

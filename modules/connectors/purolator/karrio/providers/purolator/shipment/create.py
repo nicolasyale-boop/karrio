@@ -29,6 +29,8 @@ from karrio.schemas.purolator.shipping_service_2_1_3 import (
     PrinterType,
     ContentDetail,
     ArrayOfContentDetail,
+    OptionsInformation,
+    FromOnLabelInformation,
 )
 
 import typing
@@ -104,16 +106,63 @@ def _shipment_request(
 ) -> lib.Serializable:
     shipper = lib.to_address(payload.shipper)
     recipient = lib.to_address(payload.recipient)
+    return_address = lib.to_address(payload.return_address) if payload.return_address else None
     packages = lib.to_packages(
         payload.parcels,
         provider_units.PackagePresets,
         required=["weight"],
     )
+    # options = lib.to_shipping_options(
+    #     payload.options,
+    #     package_options=packages.options,
+    #     initializer=provider_units.shipping_options_initializer,
+    # )
+
+    # On initialise les options en passant le code pays et le service pour votre logique d'initialisation
     options = lib.to_shipping_options(
-        payload.options,
+        {
+            **payload.options,
+            "service": payload.service,
+            "country_code": recipient.country_code,
+        },
         package_options=packages.options,
         initializer=provider_units.shipping_options_initializer,
     )
+
+    # Récupération sécurisée via le SDK Karrio
+    # .state renvoie directement la chaîne de caractères si l'option est présente, sinon None
+    ref_1 = options.reference1.state or payload.reference or ""
+    ref_2 = options.reference2.state or ""
+    ref_3 = options.reference3.state or ""
+    ref_4 = options.reference4.state or ""
+
+    # --- SÉPARATION PROPRE DES OPTIONS ---
+    shipment_options = []
+    piece_options = []
+    version = "v2"  # Correspond au namespace XML v2 détecté dans vos logs
+
+    for key, option in options.items():
+        if option.state is not False and option.state is not None and option.state != "":
+            # Extraction de la valeur textuelle propre (ex: "LimitedQuantities" ou "true")
+            value_text = "true" if option.state is True else str(getattr(option.state, "value", option.state))
+            
+            # Instanciation de l'objet de schéma natif
+            pair = OptionIDValuePair(
+                ID=option.code,
+                Value=value_text
+            )
+            
+            # PROTECTION SÉRIALISEUR : On force la propagation des préfixes enfants
+            pair.ID_nsprefix_ = version
+            pair.Value_nsprefix_ = version
+
+            # Tri selon la catégorie meta définie dans votre units.py
+            category = option.meta.get("category") if option.meta else None
+            
+            if category == "SPECIAL_HANDLING":
+                piece_options.append(pair)
+            elif category in ["DANGEROUS_GOOD", "SIGNATURE", "COD", "PUDO", "DELIVERY_OPTIONS"]:
+                shipment_options.append(pair)
 
     payment = payload.payment or models.Payment()
     customs = lib.to_customs_info(payload.customs)
@@ -265,25 +314,23 @@ def _shipment_request(
                                     if package.height.value
                                     else None
                                 ),
-                                Options=None,
+                                Options=(
+                                    ArrayOfOptionIDValuePair(OptionIDValuePair=piece_options)
+                                    if len(piece_options) > 0
+                                    else None
+                                )
                             )
                             for package in packages
                         ]
                     ),
                     DangerousGoodsDeclarationDocumentIndicator=None,
                     OptionsInformation=(
-                        ArrayOfOptionIDValuePair(
-                            OptionIDValuePair=[
-                                OptionIDValuePair(
-                                    ID=option.code,
-                                    Value=lib.to_money(option.state),
-                                )
-                                for _, option in options.items()
-                            ]
+                        OptionsInformation(
+                            Options=ArrayOfOptionIDValuePair(OptionIDValuePair=shipment_options)
                         )
-                        if any(options.items())
+                        if len(shipment_options) > 0
                         else None
-                    ),
+                    )
                 ),
                 InternationalInformation=(
                     InternationalInformation(
@@ -360,8 +407,13 @@ def _shipment_request(
                     else None
                 ),
                 TrackingReferenceInformation=(
-                    TrackingReferenceInformation(Reference1=payload.reference)
-                    if any(payload.reference or "")
+                    TrackingReferenceInformation(
+                        Reference1=ref_1,
+                        Reference2=ref_2,
+                        Reference3=ref_3,
+                        Reference4=ref_4,
+                    )
+                    if any([ref_1, ref_2, ref_3, ref_4])
                     else None
                 ),
                 OtherInformation=None,

@@ -23,6 +23,7 @@ from karrio.schemas.purolator.estimate_service_2_1_2 import (
     InternationalInformation,
     ArrayOfOptionIDValuePair,
     OptionIDValuePair,
+    OptionsInformation,
 )
 
 import typing
@@ -106,12 +107,47 @@ def rate_request(
         service_type=provider_units.ShippingService,
         initializer=provider_units.shipping_services_initializer,
     ).first
+
+    # To properly initialize option with dangerous_goods, we need the service type and recipient country code. So we merge them into the payload options before initializing.
     options = lib.to_shipping_options(
-        payload.options,
+        {
+            **payload.options,
+            "service": service,
+            "country_code": recipient.country_code,
+        },
         package_options=packages.options,
-        service_is_defined=(getattr(service, "value", None) in payload.services),
         initializer=provider_units.shipping_options_initializer,
     )
+
+        # --- Separate piece options and shipment options ---
+    shipment_options = []
+    piece_options = []
+    version = "v2"  # Correspond au namespace XML v2 détecté dans vos logs
+
+    for key, option in options.items():
+        if option.state is not False and option.state is not None and option.state != "":
+            # Extraction de la valeur textuelle propre (ex: "LimitedQuantities" ou "true")
+            value_text = "true" if option.state is True else str(getattr(option.state, "value", option.state))
+            
+            # Instanciation de l'objet de schéma natif
+            pair = OptionIDValuePair(
+                ID=option.code,
+                Value=value_text
+            )
+            
+            # PROTECTION SÉRIALISEUR : On force la propagation des préfixes enfants
+            pair.ID_nsprefix_ = version
+            pair.Value_nsprefix_ = version
+
+            # Tri selon la catégorie meta définie dans votre units.py
+            category = option.meta.get("category") if option.meta else None
+            
+            if category == "SPECIAL_HANDLING":
+                piece_options.append(pair)
+            elif category in ["DANGEROUS_GOOD", "SIGNATURE", "COD", "PUDO", "DELIVERY_OPTIONS"]:
+                shipment_options.append(pair)
+
+
     shipper_phone = units.Phone(shipper.phone_number, shipper.country_code or "CA")
     recipient_phone = units.Phone(recipient.phone_number, recipient.country_code)
 
@@ -247,23 +283,23 @@ def rate_request(
                                     if package.height.value
                                     else None
                                 ),
-                                Options=ArrayOfOptionIDValuePair(
-                                    OptionIDValuePair=[
-                                        OptionIDValuePair(
-                                            ID=option.code,
-                                            Value=lib.to_money(option.state),
-                                        )
-                                        for _, option in options.items()
-                                    ]
+                                Options=(
+                                    ArrayOfOptionIDValuePair(OptionIDValuePair=piece_options)
+                                    if len(piece_options) > 0
+                                    else None
                                 )
-                                if any(options.items())
-                                else None,
                             )
                             for package in packages
                         ]
                     ),
                     DangerousGoodsDeclarationDocumentIndicator=None,
-                    OptionsInformation=None,
+                    OptionsInformation=(
+                        OptionsInformation(
+                            Options=ArrayOfOptionIDValuePair(OptionIDValuePair=shipment_options)
+                        )
+                        if len(shipment_options) > 0
+                        else None
+                    )
                 ),
                 InternationalInformation=(
                     InternationalInformation(
