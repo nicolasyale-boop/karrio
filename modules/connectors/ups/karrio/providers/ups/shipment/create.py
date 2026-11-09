@@ -262,26 +262,26 @@ def shipment_request(
                 ),
                 DocumentsOnlyIndicator=("Y" if packages.is_document else None),
                 Shipper=ups.ShipperType(
-                    Name=(shipper.company_name or shipper.person_name),
-                    AttentionName=shipper.person_name,
-                    CompanyDisplayableName=shipper.company_name,
-                    TaxIdentificationNumber=shipper.federal_tax_id,
+                    Name=(return_address.company_name or return_address.person_name),
+                    AttentionName=return_address.person_name,
+                    CompanyDisplayableName=return_address.company_name,
+                    TaxIdentificationNumber=return_address.federal_tax_id,
                     Phone=ups.ShipToPhoneType(
-                        Number=lib.text(shipper.phone_number, max=15) or "000-000-0000",
+                        Number=lib.text(return_address.phone_number, max=15) or "000-000-0000",
                     ),
                     ShipperNumber=settings.account_number,
                     FaxNumber=None,
-                    EMailAddress=shipper.email,
+                    EMailAddress=return_address.email,
                     Address=ups.AlternateDeliveryAddressAddressType(
                         AddressLine=[
-                            lib.text(line, max=35) for line in shipper.address_lines
+                            lib.text(line, max=35) for line in return_address.address_lines
                         ],
-                        City=shipper.city,
-                        StateProvinceCode=shipper.state_code,
-                        PostalCode=shipper.postal_code,
-                        CountryCode=shipper.country_code,
+                        City=return_address.city,
+                        StateProvinceCode=return_address.state_code,
+                        PostalCode=return_address.postal_code,
+                        CountryCode=return_address.country_code,
                         ResidentialAddressIndicator=(
-                            "Y" if shipper.residential else None
+                            "Y" if return_address.residential else None
                         ),
                     ),
                 ),
@@ -312,32 +312,36 @@ def shipment_request(
                     Residential=("Y" if recipient.residential else None),
                 ),
                 AlternateDeliveryAddress=None,
-                ShipFrom=ups.ShipFromType(
-                    Name=(return_address.company_name or return_address.person_name),
-                    AttentionName=return_address.contact,
-                    CompanyDisplayableName=return_address.company_name,
-                    TaxIdentificationNumber=return_address.tax_id,
-                    TaxIDType=None,
-                    Phone=ups.ShipFromPhoneType(
-                        Number=lib.text(return_address.phone_number, max=15) or "000-000-0000",
-                    ),
-                    ShipFromAccountNumber=None,
-                    FaxNumber=None,
-                    EMailAddress=return_address.email,
-                    Address=ups.AlternateDeliveryAddressAddressType(
-                        AddressLine=[
-                            lib.text(line, max=35)
-                            for line in return_address.address_lines
-                        ],
-                        City=return_address.city,
-                        StateProvinceCode=return_address.state_code,
-                        PostalCode=return_address.postal_code,
-                        CountryCode=return_address.country_code,
-                        ResidentialAddressIndicator=(
-                            "Y" if return_address.residential else None
+                ShipFrom=lib.identity(
+                    ups.ShipFromType(
+                        Name=(shipper.company_name or shipper.person_name),
+                        AttentionName=shipper.contact,
+                        CompanyDisplayableName=shipper.company_name,
+                        TaxIdentificationNumber=shipper.tax_id,
+                        TaxIDType=None,
+                        Phone=ups.ShipFromPhoneType(
+                            Number=lib.text(shipper.phone_number, max=15) or "000-000-0000",
                         ),
-                    ),
-                    VendorInfo=None,
+                        ShipFromAccountNumber=None,
+                        FaxNumber=None,
+                        EMailAddress=shipper.email,
+                        Address=ups.AlternateDeliveryAddressAddressType(
+                            AddressLine=[
+                                lib.text(line, max=35)
+                                for line in shipper.address_lines
+                            ],
+                            City=shipper.city,
+                            StateProvinceCode=shipper.state_code,
+                            PostalCode=shipper.postal_code,
+                            CountryCode=shipper.country_code,
+                            ResidentialAddressIndicator=(
+                                "Y" if shipper.residential else None
+                            ),
+                        ),
+                        VendorInfo=None,
+                    )
+                    if payload.return_address is not None
+                    else None
                 ),
                 PaymentInformation=ups.PaymentInformationType(
                     ShipmentCharge=[
