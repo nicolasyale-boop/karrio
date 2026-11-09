@@ -409,13 +409,21 @@ def shipment_request(
                 ),
                 MovementReferenceNumber=None,
                 ReferenceNumber=lib.identity(
-                    ups.ReferenceNumberType(
-                        Value=payload.reference,
-                    )
-                    if (country_pair not in ["US/US", "PR/PR"])
-                    and any(payload.reference or "")
-                    else None
-                ),
+                    [
+                        ups.ReferenceNumberType(
+                            Value=lib.text(val, max=35),
+                        )
+                        for val in [
+                            (options.reference1.state or payload.reference),
+                            options.reference2.state,
+                            options.reference3.state,
+                            options.reference4.state,
+                        ]
+                        if val not in [None, ""]
+                    ]
+                )
+                if (country_pair not in ["US/US", "PR/PR"])
+                else None,
                 Service=ups.LabelImageFormatType(
                     Code=service.value_or_key,
                     Description=service.name_or_key,
@@ -847,13 +855,21 @@ def shipment_request(
                         ),
                         UPSPremier=None,
                         ReferenceNumber=lib.identity(
-                            ups.ReferenceNumberType(
-                                Value=package.parcel.reference_number,
-                            )
-                            if (country_pair in ["US/US", "PR/PR"])
-                            and any(package.parcel.reference_number or "")
-                            else None
-                        ),
+                            [
+                                ups.ReferenceNumberType(
+                                    Value=lib.text(val, max=35),
+                                )
+                                for val in [
+                                    (package.options.reference1.state or payload.reference),
+                                    package.options.reference2.state,
+                                    package.options.reference3.state,
+                                    package.options.reference4.state,
+                                ]
+                                if val not in [None, ""]
+                            ]
+                        )
+                        if (country_pair in ["US/US", "PR/PR"])
+                        else None,
                     )
                     for package in packages
                 ],

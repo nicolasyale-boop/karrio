@@ -468,6 +468,12 @@ class ShippingOption(utils.Enum):
     saturday_delivery = ups_saturday_delivery_indicator
     # fmt: on
 
+    """ Ajout des options de référece """
+    reference1 = lib.OptionEnum("reference1", str, meta=dict(category="REFERENCE"))
+    reference2 = lib.OptionEnum("reference2", str, meta=dict(category="REFERENCE"))
+    reference3 = lib.OptionEnum("reference3", str, meta=dict(category="REFERENCE"))
+    reference4 = lib.OptionEnum("reference4", str, meta=dict(category="REFERENCE"))
+
 
 class DeliveryConfirmationType(utils.StrEnum):
     signature_required = "1"  # DC-SR
