@@ -29,6 +29,8 @@ from karrio.schemas.purolator.shipping_service_2_1_3 import (
     PrinterType,
     ContentDetail,
     ArrayOfContentDetail,
+    OptionsInformation,
+    FromOnLabelInformation,
 )
 
 import typing
@@ -67,6 +69,18 @@ def _extract_shipment(
         DocumentDetail(),
     )
     invoice = next((doc for doc in documents if "Invoice" in doc.DocumentType), None)
+    
+    piece_pins_container = lib.find_element("PiecePINs", response, first=True)
+    
+    individual_pins = []
+    if piece_pins_container is not None:
+        pins_elements = lib.find_element("PIN", piece_pins_container, PIN)
+        individual_pins = [p.Value for p in pins_elements if getattr(p, "Value", None)]
+
+    # In case Purolator returns a single PIN instead of a list, we ensure that individual_pins is populated correctly.
+    if not individual_pins and pin.Value:
+        individual_pins = [pin.Value]
+
 
     return models.ShipmentDetails(
         carrier_name=settings.carrier_name,
@@ -79,6 +93,7 @@ def _extract_shipment(
         ),
         meta=dict(
             carrier_tracking_link=settings.tracking_url.format(pin.Value),
+            tracking_numbers=individual_pins,
         ),
     )
 
@@ -104,16 +119,60 @@ def _shipment_request(
 ) -> lib.Serializable:
     shipper = lib.to_address(payload.shipper)
     recipient = lib.to_address(payload.recipient)
+    return_address = lib.to_address(payload.return_address) if payload.return_address else None
     packages = lib.to_packages(
         payload.parcels,
         provider_units.PackagePresets,
         required=["weight"],
     )
+    # options = lib.to_shipping_options(
+    #     payload.options,
+    #     package_options=packages.options,
+    #     initializer=provider_units.shipping_options_initializer,
+    # )
+
+    # On initialise les options en passant le code pays et le service pour votre logique d'initialisation
     options = lib.to_shipping_options(
-        payload.options,
+        {
+            **payload.options,
+            "service": payload.service,
+            "country_code": recipient.country_code,
+        },
         package_options=packages.options,
         initializer=provider_units.shipping_options_initializer,
     )
+
+    ref_1 = options.reference1.state or payload.reference or ""
+    ref_2 = options.reference2.state or ""
+    ref_3 = options.reference3.state or ""
+    ref_4 = options.reference4.state or ""
+
+    shipment_options = []
+    piece_options = []
+    version = "v2"  # Correspond au namespace XML v2 détecté dans vos logs
+
+    for key, option in options.items():
+        if option.state is not False and option.state is not None and option.state != "":
+            # Extraction de la valeur textuelle propre (ex: "LimitedQuantities" ou "true")
+            value_text = "true" if option.state is True else str(getattr(option.state, "value", option.state))
+            
+            # Instanciation de l'objet de schéma natif
+            pair = OptionIDValuePair(
+                ID=option.code,
+                Value=value_text
+            )
+            
+            # PROTECTION SÉRIALISEUR : On force la propagation des préfixes enfants
+            pair.ID_nsprefix_ = version
+            pair.Value_nsprefix_ = version
+
+            # Tri selon la catégorie meta définie dans votre units.py
+            category = option.meta.get("category") if option.meta else None
+            
+            if category == "SPECIAL_HANDLING":
+                piece_options.append(pair)
+            elif category in ["DANGEROUS_GOOD", "SIGNATURE", "COD", "PUDO", "DELIVERY_OPTIONS"]:
+                shipment_options.append(pair)
 
     payment = payload.payment or models.Payment()
     customs = lib.to_customs_info(payload.customs)
@@ -126,6 +185,11 @@ def _shipment_request(
     recipient_phone_number = units.Phone(
         recipient.phone_number or "000 000 0000", recipient.country_code
     )
+    return_address_phone_number = units.Phone(
+        return_address.phone_number or "000 000 0000", return_address.country_code
+    )
+
+    has_return_address = getattr(payload, "return_address", None) is not None
 
     request = lib.create_envelope(
         header_content=RequestContext(
@@ -193,8 +257,35 @@ def _shipment_request(
                     ),
                     TaxNumber=(recipient.federal_tax_id or recipient.state_tax_id),
                 ),
-                FromOnLabelIndicator=None,
-                FromOnLabelInformation=None,
+                #FromOnLabelIndicator=None,
+                FromOnLabelIndicator=True if has_return_address else None,
+                FromOnLabelInformation=FromOnLabelInformation(
+                    Address=Address(
+                        Name=return_address.person_name if return_address else None,
+                        Company=return_address.company_name if return_address else None,
+                        Department=None,
+                        StreetNumber=return_address.street_number if return_address else None,
+                        StreetSuffix=None,
+                        StreetName=lib.text(return_address.address_line1) if return_address else None,
+                        StreetType=None,
+                        StreetDirection=None,
+                        Suite=None,
+                        Floor=None,
+                        StreetAddress2=lib.text(return_address.address_line2) if return_address else None,
+                        StreetAddress3=None,
+                        City=return_address.city if return_address else None,
+                        Province=return_address.state_code if return_address else None,
+                        Country=return_address.country_code if return_address else None,
+                        PostalCode=return_address.postal_code if return_address else None,
+                        PhoneNumber=PhoneNumber(
+                            CountryCode=return_address_phone_number.country_code or "0",
+                            AreaCode=return_address_phone_number.area_code or "0",
+                            Phone=return_address_phone_number.phone or "0",
+                            Extension=None,
+                        ),
+                        FaxNumber=None,
+                    ),
+                ),
                 ShipmentDate=options.shipment_date.state,
                 PackageInformation=PackageInformation(
                     ServiceID=service,
@@ -265,25 +356,23 @@ def _shipment_request(
                                     if package.height.value
                                     else None
                                 ),
-                                Options=None,
+                                Options=(
+                                    ArrayOfOptionIDValuePair(OptionIDValuePair=piece_options)
+                                    if len(piece_options) > 0
+                                    else None
+                                )
                             )
                             for package in packages
                         ]
                     ),
                     DangerousGoodsDeclarationDocumentIndicator=None,
                     OptionsInformation=(
-                        ArrayOfOptionIDValuePair(
-                            OptionIDValuePair=[
-                                OptionIDValuePair(
-                                    ID=option.code,
-                                    Value=lib.to_money(option.state),
-                                )
-                                for _, option in options.items()
-                            ]
+                        OptionsInformation(
+                            Options=ArrayOfOptionIDValuePair(OptionIDValuePair=shipment_options)
                         )
-                        if any(options.items())
+                        if len(shipment_options) > 0
                         else None
-                    ),
+                    )
                 ),
                 InternationalInformation=(
                     InternationalInformation(
@@ -360,8 +449,13 @@ def _shipment_request(
                     else None
                 ),
                 TrackingReferenceInformation=(
-                    TrackingReferenceInformation(Reference1=payload.reference)
-                    if any(payload.reference or "")
+                    TrackingReferenceInformation(
+                        Reference1=ref_1,
+                        Reference2=ref_2,
+                        Reference3=ref_3,
+                        Reference4=ref_4,
+                    )
+                    if any([ref_1, ref_2, ref_3, ref_4])
                     else None
                 ),
                 OtherInformation=None,
