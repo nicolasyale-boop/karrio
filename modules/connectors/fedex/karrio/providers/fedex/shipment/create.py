@@ -168,7 +168,7 @@ def shipment_request(
     label_type, label_format = lib.identity(
         provider_units.LabelType.map(payload.label_type or "PDF_4x6").value
     )
-    return_address = lib.to_address(payload.return_address)
+    return_address = lib.to_address(payload.return_address or payload.shipper)
     billing_address = lib.to_address(
         payload.billing_address
         or dict(
@@ -232,27 +232,27 @@ def shipment_request(
             ),
             shipper=fedex.ShipperType(
                 address=fedex.AddressType(
-                    streetLines=shipper.address_lines,
-                    city=shipper.city,
-                    stateOrProvinceCode=provider_utils.state_code(shipper),
-                    postalCode=shipper.postal_code,
-                    countryCode=shipper.country_code,
-                    residential=shipper.residential,
+                    streetLines=return_address.address_lines,
+                    city=return_address.city,
+                    stateOrProvinceCode=provider_utils.state_code(return_address),
+                    postalCode=return_address.postal_code,
+                    countryCode=return_address.country_code,
+                    residential=return_address.residential,
                 ),
                 contact=fedex.ContactType(
-                    personName=lib.text(shipper.contact, max=35),
-                    emailAddress=shipper.email,
+                    personName=lib.text(return_address.contact, max=35),
+                    emailAddress=return_address.email,
                     phoneNumber=lib.text(
-                        shipper.phone_number or "000-000-0000",
+                        return_address.phone_number or "000-000-0000",
                         max=15,
                         trim=True,
                     ),
                     phoneExtension=None,
-                    companyName=lib.text(shipper.company_name, max=35),
+                    companyName=lib.text(return_address.company_name, max=35),
                     faxNumber=None,
                 ),
                 tins=lib.identity(
-                    fedex.TinType(number=shipper.tax_id) if shipper.has_tax_info else []
+                    fedex.TinType(number=return_address.tax_id) if return_address.has_tax_info else []
                 ),
                 deliveryInstructions=options.shipper_instructions.state,
             ),
@@ -304,23 +304,23 @@ def shipment_request(
             origin=lib.identity(
                 fedex.OriginType(
                     address=fedex.AddressType(
-                        streetLines=return_address.address_lines,
-                        city=return_address.city,
-                        stateOrProvinceCode=provider_utils.state_code(return_address),
-                        postalCode=return_address.postal_code,
-                        countryCode=return_address.country_code,
-                        residential=return_address.residential,
+                        streetLines=shipper.address_lines,
+                        city=shipper.city,
+                        stateOrProvinceCode=provider_utils.state_code(shipper),
+                        postalCode=shipper.postal_code,
+                        countryCode=shipper.country_code,
+                        residential=shipper.residential,
                     ),
                     contact=fedex.ContactType(
-                        personName=lib.text(return_address.contact, max=35),
-                        emailAddress=return_address.email,
+                        personName=lib.text(shipper.contact, max=35),
+                        emailAddress=shipper.email,
                         phoneNumber=lib.text(
-                            return_address.phone_number or "000-000-0000",
+                            shipper.phone_number or "000-000-0000",
                             max=15,
                             trim=True,
                         ),
                         phoneExtension=None,
-                        companyName=lib.text(return_address.company_name, max=35),
+                        companyName=lib.text(shipper.company_name, max=35),
                         faxNumber=None,
                     ),
                 )
