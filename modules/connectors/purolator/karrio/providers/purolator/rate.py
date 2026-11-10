@@ -284,7 +284,7 @@ def rate_request(
                     RegisteredAccountNumber=settings.account_number,
                 ),
                 PickupInformation=PickupInformation(
-                    PickupType=PickupType.DROP_OFF.value
+                    PickupType=PickupType.PRE_SCHEDULED.value
                 ),
                 NotificationInformation=None,
                 TrackingReferenceInformation=(

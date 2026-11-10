@@ -305,7 +305,7 @@ def shipment_request(
             recipientLocationNumber=None,
             pickupType=(
                 options.fedex_pickup_type.state
-                or provider_units.FedExPickupType.DROPOFF_AT_FEDEX_LOCATION.value
+                or provider_units.FedExPickupType.USE_SCHEDULED_PICKUP.value
             ),
             serviceType=service,
             packagingType=lib.identity(

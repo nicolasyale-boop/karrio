@@ -347,7 +347,7 @@ def _shipment_request(
                     else None
                 ),
                 PickupInformation=PickupInformation(
-                    PickupType=PickupType.DROP_OFF.value
+                    PickupType=PickupType.PRE_SCHEDULED.value
                 ),
                 NotificationInformation=(
                     NotificationInformation(

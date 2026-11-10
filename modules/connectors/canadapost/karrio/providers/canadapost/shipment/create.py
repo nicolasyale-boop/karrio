@@ -150,7 +150,7 @@ def shipment_request(
             customer_request_id=customer_request_ids[index],
             groupIdOrTransmitShipment=canadapost.groupIdOrTransmitShipment(),
             quickship_label_requested=None,
-            cpc_pickup_indicator=None,
+            cpc_pickup_indicator=True,
             requested_shipping_point=provider_utils.format_ca_postal_code(
                 shipper.postal_code
             ),

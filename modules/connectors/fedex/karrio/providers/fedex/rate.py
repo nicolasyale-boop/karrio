@@ -213,7 +213,7 @@ def rate_request(
             shipDateStamp=lib.fdate(shipment_date, "%Y-%m-%d"),
             pickupType=(
                 options.fedex_pickup_type.state
-                or provider_units.FedExPickupType.DROPOFF_AT_FEDEX_LOCATION.value
+                or provider_units.FedExPickupType.USE_SCHEDULED_PICKUP.value
             ),
             requestedPackageLineItems=[
                 fedex.RequestedPackageLineItemType(
