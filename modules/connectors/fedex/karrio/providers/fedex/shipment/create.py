@@ -749,17 +749,19 @@ def shipment_request(
                         for _ref in [
                             fedex.CustomerReferenceType(
                                 customerReferenceType="CUSTOMER_REFERENCE",
-                                value=lib.text(payload.reference, max=30),
+                                value=lib.text(options.reference1.state or payload.reference, max=30),
                             ),
                             fedex.CustomerReferenceType(
                                 customerReferenceType="DEPARTMENT_NUMBER",
-                                value=lib.text(
-                                    options.fedex_department_number.state, max=30
-                                ),
+                                value=lib.text(options.reference4.state or options.fedex_department_number.state, max=30),
                             ),
                             fedex.CustomerReferenceType(
                                 customerReferenceType="P_O_NUMBER",
-                                value=lib.text(options.fedex_po_number.state, max=30),
+                                value=lib.text(options.reference2.state or options.fedex_po_number.state, max=30),
+                            ),
+                            fedex.CustomerReferenceType(
+                                customerReferenceType="INVOICE_NUMBER",
+                                value=lib.text(options.reference3.state or options.fedex_invoice_number.state, max=30),
                             ),
                             # RMA_ASSOCIATION max length is 20 per the FedEx spec
                             fedex.CustomerReferenceType(

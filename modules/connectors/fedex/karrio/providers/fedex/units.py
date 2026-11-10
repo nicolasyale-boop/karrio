@@ -367,6 +367,7 @@ class ShippingOption(lib.Enum):
     )
     fedex_department_number = lib.OptionEnum("fedex_department_number")
     fedex_po_number = lib.OptionEnum("fedex_po_number")
+    fedex_invoice_number = lib.OptionEnum("fedex_invoice_number")
     fedex_rma_association = lib.OptionEnum("fedex_rma_association")
     fedex_smart_post_hub_id = lib.OptionEnum("SMART_POST_HUB_ID")
     fedex_smart_post_allowed_indicia = lib.OptionEnum("SMART_POST_ALLOWED_INDICIA")
@@ -383,6 +384,12 @@ class ShippingOption(lib.Enum):
     fedex_signature_option = lib.OptionEnum("SIGNATURE_OPTION", meta=dict(category="SIGNATURE"))
     fedex_evening = lib.OptionEnum("EVENING", bool, meta=dict(category="DELIVERY_OPTIONS"))
     fedex_date_certain = lib.OptionEnum("DATE_CERTAIN", bool, meta=dict(category="DELIVERY_OPTIONS"))
+
+    """ Additional Reference Options """
+    reference1 = lib.OptionEnum("reference1", str, meta=dict(category="REFERENCE"))
+    reference2 = lib.OptionEnum("reference2", str, meta=dict(category="REFERENCE"))
+    reference3 = lib.OptionEnum("reference3", str, meta=dict(category="REFERENCE"))
+    reference4 = lib.OptionEnum("reference4", str, meta=dict(category="REFERENCE"))
 
     """ Unified Option type mapping """
     cash_on_delivery = fedex_cod
