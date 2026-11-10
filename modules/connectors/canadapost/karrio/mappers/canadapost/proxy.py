@@ -70,6 +70,7 @@ class Proxy(proxy.Proxy):
                     "Accept": "application/vnd.cpc.shipment-v8+xml",
                     "Authorization": f"Basic {self.settings.authorization}",
                     "Accept-language": f"{self.settings.language}-CA",
+                    "X-CPC-Zonos-Key": f"{self.settings.zonos_key}"
                 },
             ),
             requests.serialize(),
