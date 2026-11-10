@@ -85,6 +85,17 @@ def _extract_details(
         if d not in labels and _get_doc_content(d)
     ]
 
+    # Get Individual trackings
+    individual_trackings = [
+        piece.trackingNumber
+        for piece in shipment.pieceResponses
+        if getattr(piece, "trackingNumber", None)
+    ]
+
+    # In case pieceResponses are not available, fallback to the master tracking number
+    if not individual_trackings and tracking_number:
+        individual_trackings = [tracking_number]
+
     return models.ShipmentDetails(
         carrier_id=settings.carrier_id,
         carrier_name=settings.carrier_name,
@@ -121,6 +132,8 @@ def _extract_details(
             fedex_carrier_code=lib.failsafe(
                 lambda: shipment.completedShipmentDetail.carrierCode
             ),
+             # Add individual tracking numbers for each piece in the shipment
+            tracking_numbers=individual_trackings,
         ),
     )
 
